@@ -1,0 +1,63 @@
+# Global constants
+skeleton:
+  year: { start: 2000, end: 2024 }
+  age: { start: 0, end: 100 }
+  sex: { Male: 'Male', Female: 'Female' }
+  regions: [
+      'AT',
+      #'AU', only 5 age groups
+      'BE',
+      'BG',
+      #'CA', only 4 age groups
+      'CH',
+      'CL',
+      'CZ',
+      'DE',
+      'DK',
+      'EE',
+      'ES',
+      'FI',
+      'FR',
+      'GB-EAW',
+      'GB-NIR',
+      'GB-SCT',
+      'GR',
+      'HR',
+      'HU',
+      'IL', # only 8 age groups
+      'IS',
+      'IT',
+      #'KR', only 5 age groups
+      'LT',
+      'LU',
+      'LV',
+      'NL',
+      'NO',
+      #'NZ', only 3 age groups
+      'PL',
+      'PT',
+      #'RU',
+      'SE',
+      'SI',
+      'SK',
+      'TW',
+      'US',
+    ]
+# forecast specs
+forecast:
+  jumpoff: 2020
+  h: 5
+# figure specifications
+figspec:
+  dimensions: { width: 180 }
+  colors:
+    sex: { 'Male': '#004b87', 'Female': '#c60c30' }
+credentials:
+  # hmd credentials (be careful not to commit)
+  hmd_usr: ''
+  hmd_pwd: ''
+  # hfd credentials (be careful not to commit)
+  hfd_usr: ''
+  hfd_pwd: ''
+# number of simulations
+nsim: 250
