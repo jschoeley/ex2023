@@ -54,10 +54,10 @@ figspec:
     sex: { 'Male': '#004b87', 'Female': '#c60c30' }
 credentials:
   # hmd credentials (be careful not to commit)
-  hmd_usr: ''
-  hmd_pwd: ''
+  hmd_usr: 'jschoeley@gmail.com'
+  hmd_pwd: '95vrs3bddj24rAUU!'
   # hfd credentials (be careful not to commit)
-  hfd_usr: ''
-  hfd_pwd: ''
+  hfd_usr: 'jschoeley@gmail.com'
+  hfd_pwd: 'nÏdL5ºîV6ãwûuðï·'
 # number of simulations
 nsim: 250

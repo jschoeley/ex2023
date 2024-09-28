@@ -24,17 +24,17 @@ MyGGplotTheme <-
     axis_title_just = 'rt',
     axis_ticks = TRUE
   ) {
-    
+
     size_med = size*scaler
     size_sml = round(size*0.7)*scaler
     base_linesize = 0.3*scaler
-    
+
     # justification of axis titles
-    xj <- switch(tolower(substr(axis_title_just, 1, 1)), b = 0, 
+    xj <- switch(tolower(substr(axis_title_just, 1, 1)), b = 0,
                  l = 0, m = 0.5, c = 0.5, r = 1, t = 1)
-    yj <- switch(tolower(substr(axis_title_just, 2, 2)), b = 0, 
+    yj <- switch(tolower(substr(axis_title_just, 2, 2)), b = 0,
                  l = 0, m = 0.5, c = 0.5, r = 1, t = 1)
-    
+
     list(
       theme_minimal(base_size = size_med, base_family = family),
       theme(
@@ -55,7 +55,7 @@ MyGGplotTheme <-
         plot.subtitle = element_text(color = 'black', size = size_med, face = 'bold'),
         plot.caption = element_text(color = 'black', size = size_sml, face = 'plain'),
         plot.background = element_blank(),
-        panel.background = element_blank(),
+        panel.background = element_rect(fill = 'grey95', colour = NA),
         #plot.margin = unit(c(1, 0.1, 0.5, 0.5), units = 'mm'),
         # grid
         panel.grid = element_blank()
@@ -126,7 +126,7 @@ MyGGplotTheme <-
 # Figure functions ------------------------------------------------
 
 #' Export ggplot
-#' 
+#'
 #' @author Jonas Schöley
 ExportFigure <-
   function(figure,
@@ -139,14 +139,14 @@ ExportFigure <-
            dpi = 300,
            add_date = FALSE) {
     require(ggplot2)
-    
+
     if (missing(filename)) {
       filename <- tolower(gsub('\\.', '_', make.names(deparse(substitute(figure)))))
     }
     if (isTRUE(add_date)) {
       filename <- paste0(Sys.Date(), '-', filename)
     }
-    
+
     arguments <-
       list(
         filename = paste0(filename, '.', device),
@@ -160,14 +160,14 @@ ExportFigure <-
         device = device
       )
     if (device == 'pdf') {
-      arguments$useDingbats <- FALSE 
+      arguments$useDingbats <- FALSE
     }
-    
+
     do.call(ggsave, arguments)
   }
 
 #' Export ggplots Stored in List
-#' 
+#'
 #' @author Jonas Schöley
 ExportFiguresFromList <- function(lst, path, ...) {
   figure_names <- tolower(gsub('\\.+', '_', make.names(names(lst))))
@@ -205,9 +205,9 @@ GenerateRowID <- function(region_iso, sex, year, age_start) {
   sex_id <- as.character(factor(sex, c('Male', 'Female', 'Total'), c('M', 'F', 'T')))
   age_id <- sprintf('%03d', age_start)
   year_id <- sprintf('%04d', year)
-  
+
   row_id <- paste0(region_id, sex_id, year_id, age_id)
-  
+
   return(row_id)
 }
 

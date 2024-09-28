@@ -318,7 +318,7 @@ lifetables$simulation[,,,,,'e0_cntrb_t',] <-
   lifetables$simulation[,,,,,'e0_cntrb_i',]
 
 # test if age decomposition sums to observed e0 difference
-arriage_e0diff_test <- abs(
+arriaga_e0diff_test <- abs(
   apply(
     lifetables$simulation[,,,,1,'e0_cntrb_t',], 2:5, sum
   ) -
@@ -326,9 +326,9 @@ arriage_e0diff_test <- abs(
 )
 
 # maximum decomposition error less than 0.1 years?
-max(arriage_e0diff_test, na.rm = TRUE) < 0.1
+max(arriaga_e0diff_test, na.rm = TRUE) < 0.1
 # distribution of decomposition errors
-hist(log(arriage_e0diff_test), breaks = 50)
+hist(log(arriaga_e0diff_test), breaks = 50)
 
 # Counterfactual Arriaga decomposition ----------------------------
 

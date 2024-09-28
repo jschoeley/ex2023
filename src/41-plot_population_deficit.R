@@ -48,18 +48,20 @@ dat <- list()
 
 dat$proj <- readRDS(paths$input$projections)
 
+# Plot population deficit -----------------------------------------
+
 popdeficit <- list()
 
 popdeficit$data <-
-  dat$proj %>%
-  group_by(year, region, nsim) %>%
+  dat$proj |>
+  group_by(year, region, nsim) |>
   summarise(
     expected_total = sum(population_dec31st_noncovidmortality),
     observed_total = sum(population_dec31st_covidmortality),
     delta_absolute = -(observed_total-expected_total),
     delta_relative = delta_absolute/expected_total
-  ) %>%
-  group_by(year, region) %>%
+  ) |>
+  group_by(year, region) |>
   summarise(
     delta_relative_Q05 = quantile(delta_relative, p = 0.05, na.rm = T),
     delta_relative_Q50 = quantile(delta_relative, p = 0.50, na.rm = T),
@@ -69,19 +71,102 @@ popdeficit$data <-
     delta_absolute_Q95 = quantile(delta_absolute, p = 0.95, na.rm = T),
     expected_total_Q50 = quantile(expected_total, p = 0.50, na.rm = T),
     observed_total_Q50 = quantile(observed_total, p = 0.50, na.rm = T)
-  ) %>%
+  ) |>
   ungroup()
 
-popdeficit$fig <- list()
+popdeficit$fig <-
+  popdeficit$data |>
+  filter(year == 2023) |>
+  mutate(
+    region_ggflag = tolower(region),
+    region_rank = rank(delta_relative_Q50)
+  ) |>
+  left_join(cnst$region, by = c('region' = 'region_code_iso3166_2')) |>
+  ggplot(aes(y = region_rank, yend = region_rank)) +
+  geom_vline(aes(xintercept = 0), size = 0.5, color = 'grey80') +
+  geom_segment(aes(x = delta_relative_Q05, xend = delta_relative_Q95),
+               size = 1, color = 'grey70') +
+  geom_text(
+    aes(
+      x = delta_relative_Q50,
+      label = region_name_en
+    ),
+    position = position_nudge(y = -0.25, x = -0.0015), hjust = 1,
+    size = 1.7, color = 'grey60'
+  ) +
+  geom_text(
+    aes(
+      x = delta_relative_Q50,
+      label = paste0(
+        formatC(delta_relative_Q50*100, digits = 2, format = 'f',
+                decimal.mark = ','), '%'
+      )
+    ),
+    position = position_nudge(y = +0.25, x = -0.0015), hjust = 1,
+    size = 1.7, color = 'grey60'
+  ) +
+  geom_text(
+    aes(
+      x = delta_relative_Q50,
+      label = paste0(
+        formatC(delta_absolute_Q50, format = 'd',
+                big.mark = ' ')
+      )
+    ),
+    position = position_nudge(y = +0.25, x = +0.0015), hjust = 0,
+    size = 1.7, color = 'grey60'
+  ) +
+  geom_point(aes(x = delta_relative_Q50), size = 5.5) +
+  geom_flag(
+    aes(x = delta_relative_Q50, country = region_ggflag), size = 5
+  ) +
+  scale_x_continuous(labels = ~scales::percent(.x, decimal.mark = '.'),
+                     breaks = seq(0, 0.05, 0.0025)) +
+  scale_y_continuous(breaks = NULL, expand = expansion(add = c(1, 1))) +
+  MyGGplotTheme(grid = 'x', axis = 'x') +
+  labs(
+    y = NULL,
+    x = 'Pandemic population deficit December 31st 2023'
+  )
+
+popdeficit$fig
+
+# Plot population deficit by sex ----------------------------------
+
+popdeficitsex <- list()
+
+popdeficitsex$data <-
+  dat$proj |>
+  group_by(sex, year, region, nsim) |>
+  summarise(
+    expected_total = sum(population_dec31st_noncovidmortality),
+    observed_total = sum(population_dec31st_covidmortality),
+    delta_absolute = -(observed_total-expected_total),
+    delta_relative = delta_absolute/expected_total
+  ) |>
+  group_by(sex, year, region) |>
+  summarise(
+    delta_relative_Q05 = quantile(delta_relative, p = 0.05, na.rm = T),
+    delta_relative_Q50 = quantile(delta_relative, p = 0.50, na.rm = T),
+    delta_relative_Q95 = quantile(delta_relative, p = 0.95, na.rm = T),
+    delta_absolute_Q05 = quantile(delta_absolute, p = 0.05, na.rm = T),
+    delta_absolute_Q50 = quantile(delta_absolute, p = 0.50, na.rm = T),
+    delta_absolute_Q95 = quantile(delta_absolute, p = 0.95, na.rm = T),
+    expected_total_Q50 = quantile(expected_total, p = 0.50, na.rm = T),
+    observed_total_Q50 = quantile(observed_total, p = 0.50, na.rm = T)
+  ) |>
+  ungroup()
+
+popdeficitsex$fig <- list()
 for (stratum in c('Female', 'Male')) {
-  popdeficit$fig[[stratum]] <-
-    popdeficit$data %>%
-    #filter(sex == stratum) %>%
+  popdeficitsex$fig[[stratum]] <-
+    popdeficitsex$data |>
+    filter(sex == stratum) |>
     filter(year == 2023) |>
     mutate(
       region_ggflag = tolower(region),
       region_rank = rank(delta_relative_Q50)
-    ) %>%
+    ) |>
     left_join(cnst$region, by = c('region' = 'region_code_iso3166_2')) |>
     ggplot(aes(y = region_rank, yend = region_rank)) +
     geom_vline(aes(xintercept = 0), size = 0.5, color = 'grey80') +
@@ -121,9 +206,9 @@ for (stratum in c('Female', 'Male')) {
     geom_flag(
       aes(x = delta_relative_Q50, country = region_ggflag), size = 5
     ) +
-    scale_x_continuous(labels = ~scales::percent(.x, decimal.mark = ','), breaks = seq(0, 0.05, 0.005)) +
-    scale_y_continuous(breaks = NULL) +
-    coord_cartesian(expand = FALSE) +
+    scale_x_continuous(labels = ~scales::percent(.x, decimal.mark = ','),
+                       breaks = seq(0, 0.05, 0.005)) +
+    scale_y_continuous(breaks = NULL, expand = expansion(add = c(1, 1))) +
     MyGGplotTheme(grid = 'x', axis = 'x') +
     labs(
       y = NULL,
@@ -131,13 +216,14 @@ for (stratum in c('Female', 'Male')) {
     )
 }
 
-popdeficit$fig$Female
+popdeficitsex$fig$Female
 
-popdeficit$fig$combined <-
-  cowplot::plot_grid(popdeficit$fig$Male, popdeficit$fig$Female, ncol = 2)
-popdeficit$fig$combined
+popdeficitsex$fig$combined <-
+  cowplot::plot_grid(popdeficitsex$fig$Male,
+                     popdeficitsex$fig$Female, ncol = 2)
+popdeficitsex$fig$combined
 
-# -----------------------------------------------------------------
+# Plot population deficit by age ----------------------------------
 
 popdeficitage <- list()
 
@@ -146,20 +232,20 @@ popdeficitage$cnst <- list(
 )
 
 popdeficitage$data <-
-  dat$proj %>%
-  filter(year == 2023) %>%
+  dat$proj |>
+  filter(year == 2023) |>
   mutate(
     agegroup =
            cut(age, popdeficitage$cnst$agegroups, include.lowest = TRUE)
   ) |>
-  group_by(year, sex, region, agegroup, nsim) %>%
+  group_by(year, sex, region, agegroup, nsim) |>
   mutate(
     popcovid = sum(population_dec31st_covidmortality),
     popnoncovid = sum(population_dec31st_noncovidmortality),
     delta_absolute = -pmin(popcovid-popnoncovid, 0),
     delta_relative = delta_absolute/popnoncovid
-  ) %>%
-  group_by(agegroup, year, sex, region) %>%
+  ) |>
+  group_by(agegroup, year, sex, region) |>
   summarise(
     delta_relative_Q05 = quantile(delta_relative, p = 0.05, na.rm = T),
     delta_relative_Q50 = quantile(delta_relative, p = 0.50, na.rm = T),
@@ -203,10 +289,12 @@ popdeficitage$data |>
 # Export ----------------------------------------------------------
 
 ExportFigure(
-  popdeficit$fig$combined, paths$output$fig, filename = '41-popdeficit',
+  popdeficit$fig, paths$output$fig, filename = '41-popdeficit',
   width = 170, height = 170, dpi = 300, device = 'pdf'
 )
 
-write.xlsx(popdeficit$data, file = paths$output$xlsx_popdeficit,
-           keepNA = TRUE, na.string = '.',
-           firstRow = TRUE, firstCol = TRUE, overwrite = TRUE)
+write.xlsx(
+  popdeficit$data, file = paths$output$xlsx_popdeficit,
+  keepNA = TRUE, na.string = '.',
+  firstRow = TRUE, firstCol = TRUE, overwrite = TRUE
+)

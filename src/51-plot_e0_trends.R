@@ -40,33 +40,56 @@ cnst <- within(list(), {
 
 dat <- list()
 
-# Function --------------------------------------------------------
-
-CalculateLifeTable <-
-  function (df, x, nx, Dx, Ex) {
-
-    require(dplyr)
-
-    df %>%
-      transmute(
-        x = {{x}},
-        nx = {{nx}},
-        mx = {{Dx}}/{{Ex}},
-        px = exp(-mx*{{nx}}),
-        qx = 1-px,
-        lx = head(cumprod(c(1, px)), -1),
-        dx = c(-diff(lx), tail(lx, 1)),
-        Lx = ifelse(mx==0, lx*nx, dx/mx),
-        Tx = rev(cumsum(rev(Lx))),
-        ex = Tx/lx
-      )
-
-  }
-
 # Load data -------------------------------------------------------
 
-dat$lt <- readRDS(paths$input$projectioninput)
-dat$lc <- readRDS('out/40-leecarter.rds')
+dat$lt <- readRDS('out/50-lifetables.rds')
+dat$lc <- readRDS('out/50-arriaga_cntfc.rds')
+
+dat$lc_sim <- readRDS('tmp/50-arriaga_cntfc_sim.rds')
+
+dimnames(dat$lc_sim)
+
+
+# Calculate p-value of e0 deficit ---------------------------------
+
+pval <- list()
+
+# simulations of actual and expected e0 by region, sex, and year
+# sim position 1 reserved for means over simulations
+pval$sim <-
+  dat$lc_sim['0',as.character(2020:2024),,,,c('ex_actual', 'ex_expected')]
+# actual and expected mean
+pval$mean <- apply(pval$sim[,,,-1,], c(1:3, 5), mean)
+
+# calculate distribution of test statistic (life expectancy deficit)
+# under H0: continuation of pre-pandemic mortality trends.
+pval$test <- pval$sim[,,,,'ex_expected']
+for (sim in 2:251) {
+  pval$test[,,,sim] <-
+    abs(pmin(
+      0, pval$sim[,,,sim,'ex_expected'] - pval$mean[,,,'ex_expected']
+    ))
+}
+# add observed test statistic
+pval$test[,,,1] <- abs(pmin(0,
+  pval$mean[,,,'ex_actual'] - pval$mean[,,,'ex_expected']
+))
+
+# calculate probability of having at least the observed effect under H0
+pval$p <- apply(pval$test, 1:3, function (x) {
+  if (any(is.na(x)) | any(is.nan(x))) {
+    p <- NA
+  } else {
+    p <- 1-ecdf(x[-1])(x[1])
+    p[x[1]<1e-12] <- 1
+  }
+  return(p)
+})
+
+pval$df <- as.data.frame.table(pval$p, stringsAsFactors = FALSE)
+names(pval$df) <- c('year', 'sex', 'region', 'e0_deficit_pval')
+pval$df$year <- as.integer(pval$df$year)
+ecdf(pval$test['2023','Total','LU',]) |> plot(verticals = TRUE)
 
 # Calculate and plot e0 -------------------------------------------
 
@@ -87,84 +110,59 @@ e0 <- list()
 
 e0$data$lt <-
   dat$lt |>
-  group_by(year, sex, region) |>
-  transmute(
-    x  = age_start,
-    nx = age_width,
-    mx = death/population_py,
-    px = exp(-mx*nx),
-    qx = 1-px,
-    lx = head(cumprod(c(1, px)), -1),
-    dx = c(-diff(lx), tail(lx, 1)),
-    Lx = ifelse(mx==0, lx*nx, dx/mx),
-    Tx = rev(cumsum(rev(Lx))),
-    ex = Tx/lx
-  ) |>
-  left_join(cnst$region, by = c('region' = 'region_code_iso3166_2')) %>%
-  filter(year %in% 2000:2023) |>
-  filter(x == 0) |>
-  ungroup()
+  filter(scenario == 'actual', sex == 'Total', age == 0, year %in% 2010:2024) |>
+  select(year, sex, region = region_iso, e0_actual = ex_mean)
 
 e0$data$lc <-
-  dat$lc$predicted |>
-  filter(age == '0') |>
-  mutate(region = as.character(region),
-         sex = as.character(sex)) |>
-  group_by(region, sex, year) |>
-  summarise(
-    mean = mean(ex),
-    sd = sd(ex)
-  ) |>
-  ungroup() |>
-  filter(year %in% 2000:2023) |>
-  left_join(e0$data$lt) |>
-  mutate(
-    ex_deficit = ex-mean,
-    ex_deficit_zscore = ex_deficit/sd
+  dat$lc |> filter(age == '0') |>
+  mutate(year = as.integer(year)) |>
+  select(
+    region = region_iso, sex, year,
+    e0_expected_avg = ex_expected_mean,
+    e0_expected_q050 = ex_expected_q0.05,
+    e0_expected_q950 = ex_expected_q0.95,
+    e0_deficit_avg = ex_actual_minus_expected_mean,
+    e0_deficit_q050 = ex_actual_minus_expected_q0.05,
+    e0_deficit_q950 = ex_actual_minus_expected_q0.95
   )
 
-e0$data$lc |>
-  group_by(region, sex) |>
-  summarise(
-    max_ex_deficit_year = which.min(ex_deficit)-1 + 2020,
-    z_score_23 = ex_deficit[year == 2023],
-    max_z_score = ex_deficit[year == max_ex_deficit_year]
-  ) |>
-  group_by(max_ex_deficit_year) |>
-  summarise(
-    n = n(),
-    mean_z_max = mean(max_z_score),
-    mean_z_2023 = mean(z_score_23)
-  )
+e0$data$combine <-
+  left_join(e0$data$lt, e0$data$lc, by = c('year', 'sex', 'region')) |>
+  left_join(pval$df, by = c('year', 'sex', 'region')) |>
+  left_join(cnst$region, by = c('region' = 'region_code_iso3166_2'))
 
 e0$fig <-
-  e0$data$lt %>%
-  ggplot(aes(x = year, group = sex, color = sex)) +
-  geom_vline(xintercept = 2020, color = 'grey') +
+  e0$data$combine |>
+  ggplot(aes(x = year)) +
+  geom_vline(xintercept = 2019.5, color = 'grey') +
   geom_ribbon(
-    aes(x = year, ymin = mean-sd, ymax = mean+sd),
-    color = NA, fill = 'grey85',
-    data = e0$data$lc
+    aes(x = year, ymin = e0_expected_q050, ymax = e0_expected_q950),
+    color = NA, fill = 'grey80'
   ) +
   geom_line(
-    aes(x = year, y = mean),
-    data = e0$data$lc
+    aes(x = year, y = e0_expected_avg),
   ) +
-  geom_line(aes(y = ex), data = . %>% filter(year < 2020)) +
-  geom_point(aes(y = ex), data = . %>% filter(year < 2020), shape = 21, fill = 'white') +
-  geom_point(aes(y = ex), data = . %>% filter(year >= 2020)) +
+  geom_line(
+    aes(y = e0_actual),
+    data = . %>% filter(year < 2020)
+  ) +
+  geom_point(aes(y = e0_actual), data = . %>% filter(year < 2020),
+             shape = 21, fill = 'white') +
+  geom_point(
+    aes(y = e0_actual),
+    data = . %>% filter(year >= 2020)
+  ) +
   scale_x_continuous(
-    breaks = seq(2000, 2023, 1),
-    labels = c('2000', rep('', 22), '2023'),
-    limits = c(2010, 2023),
+    breaks = seq(2010, 2024, 1),
+    labels = c('2010', rep('', 9), "'20", rep('', 3), "'24"),
+    limits = c(2010, 2024),
   ) +
-  scale_y_continuous(breaks = seq(70, 90, 2)) +
-  scale_color_manual(values = unlist(config$figspec$colors$sex)) +
-  MyGGplotTheme(grid = 'y', axis = 'x', panel_border = TRUE) +
+  scale_y_continuous(breaks = seq(70, 90, 1)) +
+  MyGGplotTheme(grid = 'y', axis = 'x', panel_border = FALSE) +
   labs(
     y = 'Period life expectancy', x = NULL
   ) +
-  facet_wrap(~region, scales = 'free_y')
+  facet_wrap(~region_name_en, ncol = 5, scales = 'free_y')
 
 e0$fig
 
@@ -175,6 +173,6 @@ ExportFigure(
   width = 170, height = 140, device = 'pdf', scale = 1.4
 )
 
-write.xlsx(e0$data, file = paths$output$xlsx_e0,
+write.xlsx(e0$data$combine, file = paths$output$xlsx_e0,
            keepNA = TRUE, na.string = '.',
            firstRow = TRUE, firstCol = TRUE, overwrite = TRUE)

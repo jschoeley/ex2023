@@ -18,10 +18,11 @@ libs <- c(
   "StMoMo",
   "tidyverse",
   "grImport2",
-  "ggflags",
+  #"ggflags",
   "scales",
   "devtools",
-  "Cairo"
+  "Cairo",
+  "cowplot"
 )
 
 install.packages(
@@ -30,9 +31,5 @@ install.packages(
   dep = TRUE
 )
 
-install.packages("ggflags", repos = c(
-  "https://jimjam-slam.r-universe.dev",
-  "https://cloud.r-project.org"))
-
 # apt install libcairo2-dev libspectre-dev librsvg2-dev libpoppler-glib-dev r-base-dev
-devtools::install_github("sjp/grConvert")
+#devtools::install_github("sjp/grConvert")
